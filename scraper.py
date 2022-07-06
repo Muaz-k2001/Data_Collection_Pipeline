@@ -44,12 +44,11 @@ class Scraper:
     def get_property_links(self, driver):
         time.sleep(3)
         properties = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class= "css-1itfubx er561h10"]/div')))
-        property_list = []
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
             property_link = a_tag.get_attribute('href')
-            property_list.append(property_link)
-        print(len(property_list))
+            self.property_list.append(property_link)
+        print(len(self.property_list))
 
     def get_property_info(self, driver):
         pass
@@ -69,4 +68,3 @@ if __name__ == '__main__':
     driver = webdriver.Chrome()
     URL = 'https://www.zoopla.co.uk/'
     start(driver, URL)
-
