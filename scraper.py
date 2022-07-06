@@ -1,3 +1,4 @@
+from enum import auto
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -6,8 +7,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 import time
 
-driver = webdriver.Chrome()
-URL = 'https://www.zoopla.co.uk/'
+
 
 class Scraper:
        
@@ -35,14 +35,17 @@ class Scraper:
         search_bar.click()
         search_bar.send_keys('NG8  Nottingham, Wollaton, Aspley')
         search_bar.send_keys(Keys.RETURN)
-        print('hello')
+
+
 
 def start(driver, URL):
     driver.get(URL)
-    r = Scraper()
-    r.accept_cookies(driver)
-    r.search_ng8(driver)
+    auto = Scraper()
+    auto.accept_cookies(driver)
+    auto.search_ng8(driver)
 
-
-start(driver, URL)
+if __name__ == '__main__':
+    driver = webdriver.Chrome()
+    URL = 'https://www.zoopla.co.uk/'
+    start(driver, URL)
 
