@@ -21,7 +21,6 @@ class Scraper:
 
 
     def accept_cookies(self):
-        time.sleep(3)
         try:
             WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "gdpr-consent-notice"]')))
             print('Found pop-up')
