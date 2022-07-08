@@ -8,9 +8,9 @@ Our family has moved house quite often, so websites like rightmove and zoopla we
 ### Milestone 2: Finding the links to each page
 When creating the scraper class, I added in the `if __name__ == '__main__'` block right from the beginning even though it was part of a later task in the milestone. Initially my driver and url were not in the init method and were within this block. I visited the website to see what I would need my functions to do and in which order they needed to run. This led to the following functions:
 
-- **accept_cookies():** This is the first function that I coded and is when I decided to switch to zoopla. The accept cookies button on rightmove was in a pop-up which was not in another frame. I kept getting errors using `WebDriverWait` about the button I was trying to click was out of bounds since there was a pop-up animation that needed to finish before the button could be clicked. Although I could add a `time.sleep()` to wait for the pop-up animation to finish, I didn't want to since it would slow down the process on fast internet, and maybe be too fast and give errors on slower internet. I decided to give zoopla a shot and it was working fine so I stuck with it.
+-**accept_cookies():** This is the first function that I coded and is when I decided to switch to zoopla. The accept cookies button on rightmove was in a pop-up which was not in another frame. I kept getting errors using `WebDriverWait` about the button I was trying to click was out of bounds since there was a pop-up animation that needed to finish before the button could be clicked. Although I could add a `time.sleep()` to wait for the pop-up animation to finish, I didn't want to since it would slow down the process on fast internet, and maybe be too fast and give errors on slower internet. I decided to give zoopla a shot and it was working fine so I stuck with it.
 
-- **search_ng8():** This wouldn't work on firefox and it was a known bug which had not yet been fixed which is why I decided at this point to switch to chrome and chromedriver.
+-**search_ng8():** This wouldn't work on firefox and it was a known bug which had not yet been fixed which is why I decided at this point to switch to chrome and chromedriver.
 
 -**get_property_links():** This would get the links of all the properties on that page (25 per full page) and would store them in a list.
 
