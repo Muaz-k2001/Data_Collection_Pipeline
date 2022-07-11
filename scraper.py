@@ -1,5 +1,5 @@
 from selenium import webdriver
-import selenium
+import uuid
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -17,7 +17,7 @@ class Scraper:
         self.big_list = []
         self.driver = webdriver.Chrome()
         self.url = url
-
+        self.info_dict = {'Link' : [], 'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : [], 'IMG link' : [], 'UID' : [], 'UUID' : []}
         
 
 
@@ -50,7 +50,7 @@ class Scraper:
             close_button.click()
         except:
             pass
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class= "css-1itfubx e34pn540"]/div')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx emu4sxi0"]/div')))
         self.property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -64,29 +64,40 @@ class Scraper:
 
     def get_unique_id(self):
         unique_id = self.url.split('/')[5]
-        print(unique_id)
+        self.info_dict['UID'].append(unique_id)
+        return self.info_dict
+
+
+    def get_uuid(self):
+        universally_uid = uuid.uuid4()
+        self.info_dict['UUID'].append(universally_uid)
+        return self.info_dict
+
 
 
     def get_property_img(self):
         property_img = self.driver.find_element(By.XPATH, '//main/div/div//li[2]//img').get_attribute('src')
+        self.info_dict['IMG link'].append(property_img)
+        return self.info_dict
 
 
 
 
     def get_property_info(self):
-        info_dict = {'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : []}
+        error_msg = 'Not Applicable'
         info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
         price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
-        info_dict['Price'].append(price)
-        bedroom = info_container.find_element(By.XPATH, './div[5]//*[text()[contains(., "bed")]]').text
-        info_dict['Bedrooms'].append(bedroom)
-        bathroom = info_container.find_element(By.XPATH, './div[5]//*[text()[contains(., "bath")]]').text
-        info_dict['Bathrooms'].append(bathroom)
+        self.info_dict['Price'].append(price)
+        bedroom = info_container.find_element(By.XPATH, './div[position() > 3]//*[text()[contains(., "bed")]]').text
+        self.info_dict['Bedrooms'].append(bedroom)
+        try:
+            bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
+            self.info_dict['Bathrooms'].append(bathroom)
+        except:
+            self.info_dict['Bathrooms'].append(error_msg)
         address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
-        info_dict['Address'].append(address)
-    pass
-
-
+        self.info_dict['Address'].append(address)
+        return self.info_dict
 
 
     def change_page(self):
@@ -99,9 +110,9 @@ class Scraper:
     def start(self):
         page_counter = 0
         self.driver.get(self.url)
-        self.driver.maximize_window()
+        # self.driver.maximize_window()
+        time.sleep(3)
         self.accept_cookies()
-        self.get_property_img()
         self.search_ng8()
         while page_counter < 4:
             page_counter += 1
@@ -112,7 +123,18 @@ class Scraper:
             self.get_property_links()
             self.big_list.extend(self.property_list)
         print(len(self.big_list))
+        time.sleep(3)
+        for property in self.big_list:
+            self.info_dict['Link'].append(property)
+            self.url = property
+            self.driver.get(self.url)
+            time.sleep(2)
+            self.get_property_info()
+            self.get_property_img()
+            self.get_unique_id()
+            self.get_uuid()
+        print(self.info_dict)
 
 if __name__ == '__main__':
-    p = Scraper('https://www.zoopla.co.uk/for-sale/details/61904109/?search_identifier=82da346e0241523011fe501a04c6bfb3')
+    p = Scraper('https://www.zoopla.co.uk/')
     p.start()
