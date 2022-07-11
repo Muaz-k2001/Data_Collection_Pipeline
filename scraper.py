@@ -24,11 +24,9 @@ class Scraper:
     def accept_cookies(self):
         try:
             WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "gdpr-consent-notice"]')))
-            print('Found pop-up')
             self.driver.switch_to.frame('gdpr-consent-notice')
             accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
             accept_cookies_button.click()
-            print('Button Clicked')
             return self.driver
         except TimeoutException:
             print('Button not found')
@@ -63,6 +61,11 @@ class Scraper:
 
 
 
+    def get_property_img(self):
+        property_img = self.driver.find_element(By.XPATH, '//main/div/div//li[2]//img').get_attribute('src')
+
+
+
 
     def get_property_info(self):
         info_dict = {'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : []}
@@ -92,17 +95,18 @@ class Scraper:
         self.driver.get(self.url)
         # self.driver.maximize_window()
         self.accept_cookies()
-        self.search_ng8()
-        while page_counter < 4:
-            page_counter += 1
-            self.get_property_links()
-            self.big_list.extend(self.property_list)
-            self.change_page()
-        if page_counter == 4:
-            self.get_property_links()
-            self.big_list.extend(self.property_list)
-        print(len(self.big_list))
+        self.get_property_img()
+        # self.search_ng8()
+        # while page_counter < 4:
+        #     page_counter += 1
+        #     self.get_property_links()
+        #     self.big_list.extend(self.property_list)
+        #     self.change_page()
+        # if page_counter == 4:
+        #     self.get_property_links()
+        #     self.big_list.extend(self.property_list)
+        # print(len(self.big_list))
 
 if __name__ == '__main__':
-    p = Scraper('https://www.zoopla.co.uk/')
+    p = Scraper('https://www.zoopla.co.uk/for-sale/details/61904109/?search_identifier=82da346e0241523011fe501a04c6bfb3')
     p.start()
