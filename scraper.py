@@ -61,6 +61,12 @@ class Scraper:
 
 
 
+
+    def get_unique_id(self):
+        unique_id = self.url.split('/')[5]
+        print(unique_id)
+
+
     def get_property_img(self):
         property_img = self.driver.find_element(By.XPATH, '//main/div/div//li[2]//img').get_attribute('src')
 
@@ -93,19 +99,19 @@ class Scraper:
     def start(self):
         page_counter = 0
         self.driver.get(self.url)
-        # self.driver.maximize_window()
+        self.driver.maximize_window()
         self.accept_cookies()
         self.get_property_img()
-        # self.search_ng8()
-        # while page_counter < 4:
-        #     page_counter += 1
-        #     self.get_property_links()
-        #     self.big_list.extend(self.property_list)
-        #     self.change_page()
-        # if page_counter == 4:
-        #     self.get_property_links()
-        #     self.big_list.extend(self.property_list)
-        # print(len(self.big_list))
+        self.search_ng8()
+        while page_counter < 4:
+            page_counter += 1
+            self.get_property_links()
+            self.big_list.extend(self.property_list)
+            self.change_page()
+        if page_counter == 4:
+            self.get_property_links()
+            self.big_list.extend(self.property_list)
+        print(len(self.big_list))
 
 if __name__ == '__main__':
     p = Scraper('https://www.zoopla.co.uk/for-sale/details/61904109/?search_identifier=82da346e0241523011fe501a04c6bfb3')
