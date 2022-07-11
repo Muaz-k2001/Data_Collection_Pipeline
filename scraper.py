@@ -1,4 +1,5 @@
 from selenium import webdriver
+import selenium
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -64,7 +65,16 @@ class Scraper:
 
 
     def get_property_info(self):
-        pass
+        info_dict = {'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : []}
+        info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
+        price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
+        info_dict['Price'].append(price)
+        bedroom = info_container.find_element(By.XPATH, './div[5]//*[text()[contains(., "bed")]]').text
+        info_dict['Bedrooms'].append(bedroom)
+        bathroom = info_container.find_element(By.XPATH, './div[5]//*[text()[contains(., "bath")]]').text
+        info_dict['Bathrooms'].append(bathroom)
+        address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
+        info_dict['Address'].append(address)
     pass
 
 

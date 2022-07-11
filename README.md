@@ -1,6 +1,6 @@
 # Data_Collection_Pipeline
 
-This file contains the progress I made and my understanding throughout the project.
+Selenium and chromedriver are used in this project to create a python script to automate a browser with the aim of obtaining and storing information. This file contains the progress I made and my understanding throughout the project.
 
 ### Milestone 1: Choosing the website
 Our family has moved house quite often, so websites like rightmove and zoopla were not foreign to me. Initially I did choose rightmove, however due to issues I had with the website during the project (which will be discussed later) I decided to change to zoopla. This decision was made quite early in the project to prevent having to go through the headache of changing websites and HTML tags weeks into the project. Whilst we're talking about changing, initially I downloaded geckodriver to use on firefox (I'm on ubuntu which has firefox by default) and ended up having to install and switch to chrome and chromedriver due to issues that were specific to using selenium on firefox.
