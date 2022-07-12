@@ -6,6 +6,7 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 import time
+import os
 
 
 
@@ -106,8 +107,18 @@ class Scraper:
 
 
 
+    def create_raw_data_folder(self):
+        directory = 'raw_data'
+        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/'
+        path = os.path.join(parent_dir, directory)
+        os.mkdir(path)
+        print('raw_data directory created')
+
+
+
 
     def start(self):
+        path = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         page_counter = 0
         self.driver.get(self.url)
         # self.driver.maximize_window()
@@ -133,7 +144,12 @@ class Scraper:
             self.get_property_img()
             self.get_unique_id()
             self.get_uuid()
-        print(self.info_dict)
+        if os.path.isdir(path) == False:
+            self.create_raw_data_folder()
+        else:
+            print('Already found raw_data folder')
+        
+
 
 if __name__ == '__main__':
     p = Scraper('https://www.zoopla.co.uk/')
