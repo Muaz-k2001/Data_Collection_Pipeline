@@ -9,7 +9,7 @@ from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 import time
 import os
-
+import shutil
 
 
 class Scraper:
@@ -53,7 +53,7 @@ class Scraper:
             close_button.click()
         except:
             pass
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e12p28aq0"]/div')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e1llytg50"]/div')))
         self.property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -72,7 +72,7 @@ class Scraper:
 
 
     def get_uuid(self):
-        universally_uid = uuid.uuid4()
+        universally_uid = str(uuid.uuid4())
         self.info_dict['UUID'].append(universally_uid)
         return self.info_dict
 
@@ -110,6 +110,11 @@ class Scraper:
 
 
     def create_raw_data_folder(self):
+        try:
+            dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
+            shutil.rmtree(dir)
+        except:
+            pass
         directory = 'raw_data'
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/'
         path = os.path.join(parent_dir, directory)
@@ -119,24 +124,26 @@ class Scraper:
 
 
 
-    def create_id_folders(self):
+    def create_id_folders(self, folder_counter):
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
-        folder_counter = 0
-        while folder_counter < len(self.big_list):
-            directory = self.info_dict['UID'][folder_counter]
-            path = os.path.join(parent_dir, directory)
-            os.mkdir(path)
-            folder_counter += 1
-        print('Folders made')
+        directory = self.info_dict['UID'][folder_counter]
+        uid_directory = os.path.join(parent_dir, directory)
+        os.mkdir(uid_directory)
+        return uid_directory
 
 
+
+
+    def create_data_files(self, uid_directory, folder_counter):
+        data = open(os.path.join(uid_directory, 'data.json'), 'a')
+        for key in self.info_dict:
+            data.write(f'{key} = {self.info_dict[key][folder_counter]}\n')
 
 
 
 
 
     def start(self):
-        path = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         page_counter = 0
         self.driver.get(self.url)
         # self.driver.maximize_window()
@@ -153,21 +160,25 @@ class Scraper:
         #     self.big_list.extend(self.property_list)
         print(len(self.big_list))
         time.sleep(3)
+        property_counter = 0
         for property in self.big_list:
             self.info_dict['Link'].append(property)
             self.url = property
             self.driver.get(self.url)
-            time.sleep(2)
+            time.sleep(1)
             self.get_property_info()
             self.get_property_img()
             self.get_unique_id()
             self.get_uuid()
-        if os.path.isdir(path) == False:
-            self.create_raw_data_folder()
-        else:
-            print('Already found raw_data folder')
-        self.create_id_folders()
-        
+            property_counter += 1
+            print(f'Got info for property {property_counter}')
+        self.create_raw_data_folder()
+        folder_counter = 0
+        while folder_counter < len(self.big_list):
+            uid_directory = self.create_id_folders(folder_counter)
+            self.create_data_files(uid_directory, folder_counter)
+            folder_counter += 1
+        print('Folders created and data stored')
 
 
 if __name__ == '__main__':
