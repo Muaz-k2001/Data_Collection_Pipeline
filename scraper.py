@@ -1,3 +1,5 @@
+from multiprocessing.sharedctypes import Value
+from plistlib import UID
 from selenium import webdriver
 import uuid
 from selenium.webdriver.support.ui import WebDriverWait
@@ -51,7 +53,7 @@ class Scraper:
             close_button.click()
         except:
             pass
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx emu4sxi0"]/div')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e12p28aq0"]/div')))
         self.property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -117,6 +119,22 @@ class Scraper:
 
 
 
+    def create_id_folders(self):
+        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
+        folder_counter = 0
+        while folder_counter < len(self.big_list):
+            directory = self.info_dict['UID'][folder_counter]
+            path = os.path.join(parent_dir, directory)
+            os.mkdir(path)
+            folder_counter += 1
+        print('Folders made')
+
+
+
+
+
+
+
     def start(self):
         path = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         page_counter = 0
@@ -125,14 +143,14 @@ class Scraper:
         time.sleep(3)
         self.accept_cookies()
         self.search_ng8()
-        while page_counter < 4:
-            page_counter += 1
-            self.get_property_links()
-            self.big_list.extend(self.property_list)
-            self.change_page()
-        if page_counter == 4:
-            self.get_property_links()
-            self.big_list.extend(self.property_list)
+        # while page_counter < 4:
+        # page_counter += 1
+        self.get_property_links()
+        self.big_list.extend(self.property_list)
+        #     self.change_page()
+        # if page_counter == 4:
+        #     self.get_property_links()
+        #     self.big_list.extend(self.property_list)
         print(len(self.big_list))
         time.sleep(3)
         for property in self.big_list:
@@ -148,6 +166,7 @@ class Scraper:
             self.create_raw_data_folder()
         else:
             print('Already found raw_data folder')
+        self.create_id_folders()
         
 
 
