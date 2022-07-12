@@ -1,10 +1,14 @@
+from multiprocessing.sharedctypes import Value
+from plistlib import UID
 from selenium import webdriver
+import uuid
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 import time
+import os
 
 
 
@@ -16,18 +20,16 @@ class Scraper:
         self.big_list = []
         self.driver = webdriver.Chrome()
         self.url = url
-
+        self.info_dict = {'Link' : [], 'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : [], 'IMG link' : [], 'UID' : [], 'UUID' : []}
         
 
 
     def accept_cookies(self):
         try:
             WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "gdpr-consent-notice"]')))
-            print('Found pop-up')
             self.driver.switch_to.frame('gdpr-consent-notice')
             accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
             accept_cookies_button.click()
-            print('Button Clicked')
             return self.driver
         except TimeoutException:
             print('Button not found')
@@ -51,7 +53,7 @@ class Scraper:
             close_button.click()
         except:
             pass
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class= "css-1itfubx e34pn540"]/div')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e12p28aq0"]/div')))
         self.property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -63,11 +65,42 @@ class Scraper:
 
 
 
+    def get_unique_id(self):
+        unique_id = self.url.split('/')[5]
+        self.info_dict['UID'].append(unique_id)
+        return self.info_dict
+
+
+    def get_uuid(self):
+        universally_uid = uuid.uuid4()
+        self.info_dict['UUID'].append(universally_uid)
+        return self.info_dict
+
+
+
+    def get_property_img(self):
+        property_img = self.driver.find_element(By.XPATH, '//main/div/div//li[2]//img').get_attribute('src')
+        self.info_dict['IMG link'].append(property_img)
+        return self.info_dict
+
+
+
+
     def get_property_info(self):
-        pass
-    pass
-
-
+        error_msg = 'Not Applicable'
+        info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
+        price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
+        self.info_dict['Price'].append(price)
+        bedroom = info_container.find_element(By.XPATH, './div[position() > 3]//*[text()[contains(., "bed")]]').text
+        self.info_dict['Bedrooms'].append(bedroom)
+        try:
+            bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
+            self.info_dict['Bathrooms'].append(bathroom)
+        except:
+            self.info_dict['Bathrooms'].append(error_msg)
+        address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
+        self.info_dict['Address'].append(address)
+        return self.info_dict
 
 
     def change_page(self):
@@ -76,22 +109,66 @@ class Scraper:
 
 
 
+    def create_raw_data_folder(self):
+        directory = 'raw_data'
+        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/'
+        path = os.path.join(parent_dir, directory)
+        os.mkdir(path)
+        print('raw_data directory created')
+
+
+
+
+    def create_id_folders(self):
+        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
+        folder_counter = 0
+        while folder_counter < len(self.big_list):
+            directory = self.info_dict['UID'][folder_counter]
+            path = os.path.join(parent_dir, directory)
+            os.mkdir(path)
+            folder_counter += 1
+        print('Folders made')
+
+
+
+
+
+
 
     def start(self):
+        path = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         page_counter = 0
         self.driver.get(self.url)
         # self.driver.maximize_window()
+        time.sleep(3)
         self.accept_cookies()
         self.search_ng8()
-        while page_counter < 4:
-            page_counter += 1
-            self.get_property_links()
-            self.big_list.extend(self.property_list)
-            self.change_page()
-        if page_counter == 4:
-            self.get_property_links()
-            self.big_list.extend(self.property_list)
+        # while page_counter < 4:
+        # page_counter += 1
+        self.get_property_links()
+        self.big_list.extend(self.property_list)
+        #     self.change_page()
+        # if page_counter == 4:
+        #     self.get_property_links()
+        #     self.big_list.extend(self.property_list)
         print(len(self.big_list))
+        time.sleep(3)
+        for property in self.big_list:
+            self.info_dict['Link'].append(property)
+            self.url = property
+            self.driver.get(self.url)
+            time.sleep(2)
+            self.get_property_info()
+            self.get_property_img()
+            self.get_unique_id()
+            self.get_uuid()
+        if os.path.isdir(path) == False:
+            self.create_raw_data_folder()
+        else:
+            print('Already found raw_data folder')
+        self.create_id_folders()
+        
+
 
 if __name__ == '__main__':
     p = Scraper('https://www.zoopla.co.uk/')
