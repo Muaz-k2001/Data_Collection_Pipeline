@@ -15,12 +15,11 @@ import shutil
 class Scraper:
        
     def __init__(self, url):
-        self.property_list = []
         self.page_count = 0
         self.big_list = []
         self.driver = webdriver.Chrome()
         self.url = url
-        self.info_dict = {'Link' : [], 'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : [], 'IMG link' : [], 'UID' : [], 'UUID' : []}
+        self.info_dict = {'Link' : [], 'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : [], 'IMG links' : [], 'UID' : [], 'UUID' : []}
         
 
 
@@ -46,21 +45,34 @@ class Scraper:
         return self.driver
 
 
+    def close_email_popup(self):
+        close_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@class= "css-e4jnh6-CancelButton e13xjwxo6"]')))
+        close_button.click()
+
 
     def get_property_links(self):
-        try:
-            close_button = WebDriverWait(self.driver, 3).until(EC.presence_of_element_located((By.XPATH, '//*[@class= "css-e4jnh6-CancelButton e13xjwxo6"]')))
-            close_button.click()
-        except:
-            pass
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e1llytg50"]/div')))
-        self.property_list.clear()
+        property_list = []
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx et6shp90"]/div[position() < 3]')))
+        # Change position value for number of links
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        #
+        property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
             property_link = a_tag.get_attribute('href')
-            self.property_list.append(property_link)
+            property_list.append(property_link)
         print('got links')
-        return self.property_list
+        return property_list
 
 
 
@@ -68,20 +80,25 @@ class Scraper:
     def get_unique_id(self):
         unique_id = self.url.split('/')[5]
         self.info_dict['UID'].append(unique_id)
-        return self.info_dict
+
 
 
     def get_uuid(self):
         universally_uid = str(uuid.uuid4())
         self.info_dict['UUID'].append(universally_uid)
-        return self.info_dict
+
 
 
 
     def get_property_img(self):
-        property_img = self.driver.find_element(By.XPATH, '//main/div/div//li[2]//img').get_attribute('src')
-        self.info_dict['IMG link'].append(property_img)
-        return self.info_dict
+        property_img_list = []
+        property_imgs = self.driver.find_elements(By.XPATH, '//main/div/div/section//li')
+        for img in property_imgs:
+            img_tag = img.find_element(By.XPATH, '//img')
+            src_link = img_tag.get_attribute('src')
+            property_img_list.append(src_link)
+        self.info_dict['IMG links'].append(property_img_list)
+
 
 
 
@@ -100,7 +117,7 @@ class Scraper:
             self.info_dict['Bathrooms'].append(error_msg)
         address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
         self.info_dict['Address'].append(address)
-        return self.info_dict
+
 
 
     def change_page(self):
@@ -144,20 +161,21 @@ class Scraper:
 
 
     def start(self):
-        page_counter = 0
         self.driver.get(self.url)
         # self.driver.maximize_window()
-        time.sleep(3)
+        time.sleep(2)
         self.accept_cookies()
         self.search_ng8()
-        # while page_counter < 4:
-        # page_counter += 1
-        self.get_property_links()
-        self.big_list.extend(self.property_list)
-        #     self.change_page()
-        # if page_counter == 4:
-        #     self.get_property_links()
-        #     self.big_list.extend(self.property_list)
+        page_counter = 0
+        while page_counter < 4:
+            if page_counter == 1:
+                self.close_email_popup()
+            property_list = self.get_property_links()
+            self.big_list.extend(property_list)
+            self.change_page()
+            page_counter += 1
+        property_list = self.get_property_links()
+        self.big_list.extend(property_list)
         print(len(self.big_list))
         time.sleep(3)
         property_counter = 0
