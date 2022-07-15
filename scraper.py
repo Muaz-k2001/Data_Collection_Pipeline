@@ -19,7 +19,7 @@ class Scraper:
         self.big_list = []
         self.driver = webdriver.Chrome()
         self.url = url
-        self.info_dict = {'Link' : [], 'Price' : [], 'Bedrooms' : [], 'Bathrooms' : [], 'Address' : [], 'IMG links' : [], 'UID' : [], 'UUID' : []}
+        self.info_dict = {'Link' : [], 'Price' : [], 'Description' : [], 'Bathrooms' : [], 'Address' : [], 'IMG links' : [], 'UID' : [], 'UUID' : []}
         
 
 
@@ -52,20 +52,7 @@ class Scraper:
 
     def get_property_links(self):
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx et6shp90"]/div[position() < 3]')))
-        # Change position value for number of links
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
-        #
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx evm8r390"]/div[position() < 3]')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -108,8 +95,8 @@ class Scraper:
         info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
         price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
         self.info_dict['Price'].append(price)
-        bedroom = info_container.find_element(By.XPATH, './div[position() > 3]//*[text()[contains(., "bed")]]').text
-        self.info_dict['Bedrooms'].append(bedroom)
+        description = info_container.find_element(By.XPATH, './div[position() > 3]//*[text()[contains(., "bed")]]').text
+        self.info_dict['Description'].append(description)
         try:
             bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
             self.info_dict['Bathrooms'].append(bathroom)
@@ -141,9 +128,9 @@ class Scraper:
 
 
 
-    def create_id_folders(self, folder_counter):
+    def create_id_folders(self, property_counter):
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
-        directory = self.info_dict['UID'][folder_counter]
+        directory = self.info_dict['UID'][property_counter]
         uid_directory = os.path.join(parent_dir, directory)
         os.mkdir(uid_directory)
         return uid_directory
@@ -151,10 +138,10 @@ class Scraper:
 
 
 
-    def create_data_files(self, uid_directory, folder_counter):
+    def create_data_files(self, uid_directory, property_counter):
         data = open(os.path.join(uid_directory, 'data.json'), 'a')
         for key in self.info_dict:
-            data.write(f'{key} = {self.info_dict[key][folder_counter]}\n')
+            data.write(f'{key} = {self.info_dict[key][property_counter]}\n')
 
 
 
@@ -179,6 +166,7 @@ class Scraper:
         print(len(self.big_list))
         time.sleep(3)
         property_counter = 0
+        self.create_raw_data_folder()
         for property in self.big_list:
             self.info_dict['Link'].append(property)
             self.url = property
@@ -188,14 +176,10 @@ class Scraper:
             self.get_property_img()
             self.get_unique_id()
             self.get_uuid()
+            uid_directory = self.create_id_folders(property_counter)
+            self.create_data_files(uid_directory, property_counter)
             property_counter += 1
             print(f'Got info for property {property_counter}')
-        self.create_raw_data_folder()
-        folder_counter = 0
-        while folder_counter < len(self.big_list):
-            uid_directory = self.create_id_folders(folder_counter)
-            self.create_data_files(uid_directory, folder_counter)
-            folder_counter += 1
         print('Folders created and data stored')
 
 
