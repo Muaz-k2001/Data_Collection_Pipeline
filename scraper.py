@@ -10,6 +10,7 @@ from selenium.webdriver.common.keys import Keys
 import time
 import os
 import shutil
+import urllib.request
 
 
 class Scraper:
@@ -24,20 +25,15 @@ class Scraper:
 
 
     def accept_cookies(self):
-        try:
-            WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "gdpr-consent-notice"]')))
-            self.driver.switch_to.frame('gdpr-consent-notice')
-            accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
-            accept_cookies_button.click()
-            return self.driver
-        except TimeoutException:
-            print('Button not found')
-
+        WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "gdpr-consent-notice"]')))
+        self.driver.switch_to.frame('gdpr-consent-notice')
+        accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
+        accept_cookies_button.click()
+        return self.driver
 
 
 
     def search_ng8(self):
-        time.sleep(1)
         search_bar = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@class="c-voGFy"]')))
         search_bar.click()
         search_bar.send_keys('NG8  Nottingham, Wollaton, Aspley')
@@ -45,14 +41,16 @@ class Scraper:
         return self.driver
 
 
+
     def close_email_popup(self):
         close_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@class= "css-e4jnh6-CancelButton e13xjwxo6"]')))
         close_button.click()
 
 
+
     def get_property_links(self):
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx evm8r390"]/div[position() < 3]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e1jkoih90"]/div[position() < 3]')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -60,8 +58,7 @@ class Scraper:
             property_list.append(property_link)
         print('got links')
         return property_list
-
-
+    
 
 
     def get_unique_id(self):
@@ -76,17 +73,17 @@ class Scraper:
 
 
 
-
     def get_property_img(self):
         property_img_list = []
+        next_img = self.driver.find_element(By.XPATH, '//main/div/div/section//button[@aria-label= "Next image"]')
         property_imgs = self.driver.find_elements(By.XPATH, '//main/div/div/section//li')
-        for img in property_imgs:
-            img_tag = img.find_element(By.XPATH, '//img')
+        for property in property_imgs[1:-1]:
+            displayed_img = property.find_element(By.XPATH, '//main/div/div/section//li[@aria-hidden= "false"]')
+            img_tag = displayed_img.find_element(By.XPATH, './/img')
             src_link = img_tag.get_attribute('src')
             property_img_list.append(src_link)
+            next_img.click()
         self.info_dict['IMG links'].append(property_img_list)
-
-
 
 
 
@@ -127,14 +124,12 @@ class Scraper:
 
 
 
-
     def create_id_folders(self, property_counter):
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         directory = self.info_dict['UID'][property_counter]
         uid_directory = os.path.join(parent_dir, directory)
         os.mkdir(uid_directory)
         return uid_directory
-
 
 
 
@@ -145,6 +140,22 @@ class Scraper:
 
 
 
+    def make_img_folder(self, uid_directory):
+        parent_dir = uid_directory
+        directory = 'Images'
+        img_path = os.path.join(parent_dir, directory)
+        os.mkdir(img_path)
+        return img_path
+
+
+
+    def download_imgs(self, img_directory):
+        property_img_list = self.info_dict['IMG links'][-1]
+        file_count = 1
+        for img in property_img_list:
+            urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
+            file_count += 1
+
 
 
     def start(self):
@@ -152,15 +163,16 @@ class Scraper:
         # self.driver.maximize_window()
         time.sleep(2)
         self.accept_cookies()
+        time.sleep(1)
         self.search_ng8()
-        page_counter = 0
-        while page_counter < 4:
-            if page_counter == 1:
-                self.close_email_popup()
-            property_list = self.get_property_links()
-            self.big_list.extend(property_list)
-            self.change_page()
-            page_counter += 1
+        # page_counter = 0
+        # while page_counter < 4:
+        #     if page_counter == 1:
+        #         self.close_email_popup()
+        #     property_list = self.get_property_links()
+        #     self.big_list.extend(property_list)
+        #     self.change_page()
+        #     page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
@@ -180,7 +192,10 @@ class Scraper:
             self.create_data_files(uid_directory, property_counter)
             property_counter += 1
             print(f'Got info for property {property_counter}')
+        img_directory = self.make_img_folder(uid_directory)
+        self.download_imgs(img_directory)
         print('Folders created and data stored')
+
 
 
 if __name__ == '__main__':
