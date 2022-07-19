@@ -14,6 +14,9 @@ import urllib.request
 
 
 class Scraper:
+    '''Scrapes a website for desired information
+    '''
+
        
     def __init__(self, url):
         self.page_count = 0
@@ -25,32 +28,37 @@ class Scraper:
 
 
     def accept_cookies(self):
+        '''Clicks the accept cookies button that pops up on inital website visit
+        '''
         WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "gdpr-consent-notice"]')))
         self.driver.switch_to.frame('gdpr-consent-notice')
         accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
         accept_cookies_button.click()
-        return self.driver
-
 
 
     def search_ng8(self):
+        '''Types the desired search location and presses enter to commence search
+        '''
         search_bar = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@class="c-voGFy"]')))
         search_bar.click()
         search_bar.send_keys('NG8  Nottingham, Wollaton, Aspley')
         search_bar.send_keys(Keys.RETURN)
-        return self.driver
 
 
 
     def close_email_popup(self):
+        '''Closes the email popup on the second page of properties
+        '''
         close_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@class= "css-e4jnh6-CancelButton e13xjwxo6"]')))
         close_button.click()
 
 
 
     def get_property_links(self):
+        '''Gets the links to all the properties on the current page
+        '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e1jkoih90"]/div[position() < 3]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx ehychxj0"]/div[position() = 1]')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -62,18 +70,24 @@ class Scraper:
 
 
     def get_unique_id(self):
+        '''Assigns a unique ID for each property from the ID given in the URL and appends to the dictionary
+        '''
         unique_id = self.url.split('/')[5]
         self.info_dict['UID'].append(unique_id)
 
 
 
     def get_uuid(self):
+        '''Generates a random Universally Unique ID (UUID) for each property and appends to the dictionary
+        '''
         universally_uid = str(uuid.uuid4())
         self.info_dict['UUID'].append(universally_uid)
 
 
 
     def get_property_img(self):
+        '''Generates a list of links for all the images for the current property and appends to the dictionary
+        '''
         property_img_list = []
         next_img = self.driver.find_element(By.XPATH, '//main/div/div/section//button[@aria-label= "Next image"]')
         property_imgs = self.driver.find_elements(By.XPATH, '//main/div/div/section//li')
@@ -88,6 +102,8 @@ class Scraper:
 
 
     def get_property_info(self):
+        '''Gets the desired information from the current property and appends to the dictionary under the relevant key
+        '''
         error_msg = 'Not Applicable'
         info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
         price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
@@ -105,12 +121,16 @@ class Scraper:
 
 
     def change_page(self):
+        '''Clicks the next button to change to the next page
+        '''
         next_page = self.driver.find_element(By.XPATH, '//*[@class= "css-qhg1xn-PaginationItemPreviousAndNext-PaginationItemNext eaoxhri2"]')
         next_page.click()
 
 
 
     def create_raw_data_folder(self):
+        '''Deletes existing raw_data folder and generates new one
+        '''
         try:
             dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
             shutil.rmtree(dir)
@@ -125,6 +145,8 @@ class Scraper:
 
 
     def create_id_folders(self, property_counter):
+        '''Creates folders in the raw_data folder for each property. The name of each folder is the UID generated earlier
+        '''
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         directory = self.info_dict['UID'][property_counter]
         uid_directory = os.path.join(parent_dir, directory)
@@ -134,6 +156,8 @@ class Scraper:
 
 
     def create_data_files(self, uid_directory, property_counter):
+        '''Inside the relevant property folder, creates a file 'data.json' containing information obtained for the property
+        '''
         data = open(os.path.join(uid_directory, 'data.json'), 'a')
         for key in self.info_dict:
             data.write(f'{key} = {self.info_dict[key][property_counter]}\n')
@@ -141,6 +165,8 @@ class Scraper:
 
 
     def make_img_folder(self, uid_directory):
+        '''Inside the relevant property folder, creates a folder named 'images' to store property images
+        '''
         parent_dir = uid_directory
         directory = 'Images'
         img_path = os.path.join(parent_dir, directory)
@@ -150,6 +176,8 @@ class Scraper:
 
 
     def download_imgs(self, img_directory):
+        '''Downloads the images for the property as a .jpg file with the image number as the image name
+        '''
         property_img_list = self.info_dict['IMG links'][-1]
         file_count = 1
         for img in property_img_list:
@@ -159,20 +187,22 @@ class Scraper:
 
 
     def start(self):
+        '''Function to dictate the flow of the code and is used to run the scraper
+        '''
         self.driver.get(self.url)
         # self.driver.maximize_window()
         time.sleep(2)
         self.accept_cookies()
         time.sleep(1)
         self.search_ng8()
-        # page_counter = 0
-        # while page_counter < 4:
-        #     if page_counter == 1:
-        #         self.close_email_popup()
-        #     property_list = self.get_property_links()
-        #     self.big_list.extend(property_list)
-        #     self.change_page()
-        #     page_counter += 1
+        page_counter = 1
+        while page_counter < 5:
+            if page_counter == 2:
+                self.close_email_popup()
+            property_list = self.get_property_links()
+            self.big_list.extend(property_list)
+            self.change_page()
+            page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
