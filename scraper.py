@@ -18,11 +18,11 @@ class Scraper:
     '''
 
        
-    def __init__(self, url):
+    def __init__(self, url, driver):
+        self.url = url
+        self.driver = driver
         self.page_count = 0
         self.big_list = []
-        self.driver = webdriver.Chrome()
-        self.url = url
         self.info_dict = {'Link' : [], 'Price' : [], 'Description' : [], 'Bathrooms' : [], 'Address' : [], 'IMG links' : [], 'UID' : [], 'UUID' : []}
         
 
@@ -34,6 +34,7 @@ class Scraper:
         self.driver.switch_to.frame('gdpr-consent-notice')
         accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
         accept_cookies_button.click()
+        return self.driver
 
 
     def search_ng8(self):
@@ -43,6 +44,8 @@ class Scraper:
         search_bar.click()
         search_bar.send_keys('NG8  Nottingham, Wollaton, Aspley')
         search_bar.send_keys(Keys.RETURN)
+        time.sleep(1)
+        self.url = self.driver.current_url
 
 
 
@@ -58,7 +61,7 @@ class Scraper:
         '''Gets the links to all the properties on the current page
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx eam28230"]/div[position() = 1]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e886dyn0"]/div[position() < 3]')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -108,7 +111,7 @@ class Scraper:
         info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
         price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
         self.info_dict['Price'].append(price)
-        description = info_container.find_element(By.XPATH, './div[position() > 3]//*[text()[contains(., "bed")]]').text
+        description = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bed")]]').text
         self.info_dict['Description'].append(description)
         try:
             bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
@@ -228,12 +231,13 @@ class Scraper:
 
 
 
-def start(url):
-    p = Scraper(url)
+def start(url, driver):
+    p = Scraper(url, driver)
     p.scrape()
 
 
 
 if __name__ == '__main__':
     url = 'https://www.zoopla.co.uk/'
-    start(url)
+    driver = webdriver.Chrome()
+    start(url, driver)
