@@ -44,8 +44,6 @@ class Scraper:
         search_bar.click()
         search_bar.send_keys('NG8  Nottingham, Wollaton, Aspley')
         search_bar.send_keys(Keys.RETURN)
-        time.sleep(1)
-        self.url = self.driver.current_url
 
 
 
@@ -61,7 +59,7 @@ class Scraper:
         '''Gets the links to all the properties on the current page
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@class="css-1itfubx e886dyn0"]/div[position() < 3]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
