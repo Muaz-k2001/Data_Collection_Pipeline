@@ -202,9 +202,7 @@ class Scraper:
 
 
 
-    def scrape(self):
-        '''Function to dictate the flow of the code and is used to run the scraper
-        '''
+    def get_links(self):
         self.driver.get(self.url)
         # self.driver.maximize_window()
         time.sleep(2)
@@ -224,6 +222,10 @@ class Scraper:
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
+
+
+
+    def get_info(self):
         property_counter = 0
         error_msg = 'N/A'
         self.create_raw_data_folder()
@@ -250,20 +252,28 @@ class Scraper:
             self.create_data_files(uid_directory, property_counter)
             property_counter += 1
             print(f'Got info for property {property_counter}')
+        return uid_directory
+    
+
+
+    def get_images(self, uid_directory):
         img_directory = self.make_img_folder(uid_directory)
-        print('Downloading...')
+        print('Downloading images...')
         self.download_imgs(img_directory)
         print('Folders created and data stored')
 
 
 
-def start(url, driver):
+
+def scrape(url, driver):
     p = Scraper(url, driver)
-    p.scrape()
+    p.get_links()
+    uid_directory = p.get_info()
+    p.get_images(uid_directory)
 
 
 
 if __name__ == '__main__':
     url = 'https://www.zoopla.co.uk/'
     driver = webdriver.Chrome()
-    start(url, driver)
+    scrape(url, driver)
