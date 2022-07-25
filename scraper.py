@@ -5,12 +5,12 @@ import uuid
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.keys import Keys
 import time
 import os
 import shutil
 import urllib.request
+import json
 
 
 class Scraper:
@@ -21,9 +21,8 @@ class Scraper:
     def __init__(self, url, driver):
         self.url = url
         self.driver = driver
-        self.page_count = 0
         self.big_list = []
-        self.info_dict = {'Link' : [], 'Price' : [], 'Description' : [], 'Bathrooms' : [], 'Address' : [], 'IMG links' : [], 'UID' : [], 'UUID' : []}
+        self.property_dict = {'Property' : []}
         
 
 
@@ -59,7 +58,7 @@ class Scraper:
         '''Gets the links to all the properties on the current page
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 4]')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -74,15 +73,15 @@ class Scraper:
         '''Assigns a unique ID for each property from the ID given in the URL and appends to the dictionary
         '''
         unique_id = self.url.split('/')[5]
-        self.info_dict['UID'].append(unique_id)
+        return unique_id
 
 
 
     def get_uuid(self):
         '''Generates a random Universally Unique ID (UUID) for each property and appends to the dictionary
         '''
-        universally_uid = str(uuid.uuid4())
-        self.info_dict['UUID'].append(universally_uid)
+        uni_uid = str(uuid.uuid4())
+        return uni_uid
 
 
 
@@ -98,26 +97,43 @@ class Scraper:
             src_link = img_tag.get_attribute('src')
             property_img_list.append(src_link)
             next_img.click()
-        self.info_dict['IMG links'].append(property_img_list)
+        return property_img_list
 
 
 
-    def get_property_info(self):
-        '''Gets the desired information from the current property and appends to the dictionary under the relevant key
-        '''
-        error_msg = 'Not Applicable'
-        info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
-        price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
-        self.info_dict['Price'].append(price)
-        description = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bed")]]').text
-        self.info_dict['Description'].append(description)
+    def get_price(self, error_msg, info_container):
+        try:
+            price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
+            return price
+        except:
+            return error_msg
+
+
+
+    def get_description(self, error_msg, info_container):
+        try:
+            description = info_container.find_element(By.XPATH, './div//*[text()[contains(., "for")]]').text
+            return description
+        except:
+            return error_msg
+
+
+
+    def get_bathrooms(self, error_msg, info_container):
         try:
             bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
-            self.info_dict['Bathrooms'].append(bathroom)
+            return bathroom
         except:
-            self.info_dict['Bathrooms'].append(error_msg)
-        address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
-        self.info_dict['Address'].append(address)
+            return error_msg
+        
+
+
+    def get_address(self, error_msg, info_container):
+        try:
+            address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
+            return address
+        except:
+            return error_msg
 
 
 
@@ -149,7 +165,7 @@ class Scraper:
         '''Creates folders in the raw_data folder for each property. The name of each folder is the UID generated earlier
         '''
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
-        directory = self.info_dict['UID'][property_counter]
+        directory = self.property_dict['Property'][property_counter]['UID']
         uid_directory = os.path.join(parent_dir, directory)
         os.mkdir(uid_directory)
         return uid_directory
@@ -159,9 +175,8 @@ class Scraper:
     def create_data_files(self, uid_directory, property_counter):
         '''Inside the relevant property folder, creates a file 'data.json' containing information obtained for the property
         '''
-        data = open(os.path.join(uid_directory, 'data.json'), 'a')
-        for key in self.info_dict:
-            data.write(f'{key} = {self.info_dict[key][property_counter]}\n')
+        with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
+            json.dump(self.property_dict['Property'][property_counter], outfile, indent= 4)
 
 
 
@@ -179,7 +194,7 @@ class Scraper:
     def download_imgs(self, img_directory):
         '''Downloads the images for the property as a .jpg file with the image number as the image name
         '''
-        property_img_list = self.info_dict['IMG links'][-1]
+        property_img_list = self.property_dict['Property'][-1]['IMG links']
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
@@ -196,34 +211,47 @@ class Scraper:
         self.accept_cookies()
         time.sleep(1)
         self.search_ng8()
-        page_counter = 1
-        while page_counter < 5:
-            if page_counter == 2:
-                self.close_email_popup()
-            property_list = self.get_property_links()
-            self.big_list.extend(property_list)
-            self.change_page()
-            page_counter += 1
+        time.sleep(3)
+        # page_counter = 1
+        # while page_counter < 5:
+        #     if page_counter == 2:
+        #         self.close_email_popup()
+        #     property_list = self.get_property_links()
+        #     self.big_list.extend(property_list)
+        #     self.change_page()
+        #     time.sleep(1)
+        #     page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
-        time.sleep(3)
         property_counter = 0
+        error_msg = 'N/A'
         self.create_raw_data_folder()
         for property in self.big_list:
-            self.info_dict['Link'].append(property)
             self.url = property
+            time.sleep(1)
             self.driver.get(self.url)
             time.sleep(1)
-            self.get_property_info()
-            self.get_property_img()
-            self.get_unique_id()
-            self.get_uuid()
+            info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
+            price = self.get_price(error_msg, info_container)
+            description = self.get_description(error_msg, info_container)
+            bathrooms = self.get_bathrooms(error_msg, info_container)
+            address = self.get_address(error_msg, info_container)
+            img = self.get_property_img()
+            uid = self.get_unique_id()
+            uni_uid = self.get_uuid()
+
+            current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
+            'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
+
+            self.property_dict['Property'].append(current_property)
+
             uid_directory = self.create_id_folders(property_counter)
             self.create_data_files(uid_directory, property_counter)
             property_counter += 1
             print(f'Got info for property {property_counter}')
         img_directory = self.make_img_folder(uid_directory)
+        print('Downloading...')
         self.download_imgs(img_directory)
         print('Folders created and data stored')
 
