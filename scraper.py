@@ -1,5 +1,4 @@
 from multiprocessing.sharedctypes import Value
-from plistlib import UID
 from selenium import webdriver
 import uuid
 from selenium.webdriver.support.ui import WebDriverWait
@@ -207,7 +206,7 @@ class Scraper:
         # self.driver.maximize_window()
         time.sleep(2)
         self.accept_cookies()
-        time.sleep(1)
+        time.sleep(2)
         self.search_ng8()
         time.sleep(3)
         # page_counter = 1
@@ -261,7 +260,6 @@ class Scraper:
         print('Downloading images...')
         self.download_imgs(img_directory)
         print('Folders created and data stored')
-
 
 
 
