@@ -10,7 +10,9 @@ import os
 import shutil
 import urllib.request
 import json
+import boto3
 
+s3_client = boto3.client('s3')
 
 class Scraper:
     '''Scrapes a website for desired information
@@ -176,27 +178,28 @@ class Scraper:
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
             json.dump(self.property_dict['Property'][property_counter], outfile, indent= 4)
+        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'{self.property_dict["Property"][property_counter]["UID"]}_data')
 
 
 
     def make_img_folder(self, uid_directory):
         '''Inside the relevant property folder, creates a folder named 'images' to store property images
         '''
-        parent_dir = uid_directory
         directory = 'Images'
-        img_path = os.path.join(parent_dir, directory)
+        img_path = os.path.join(uid_directory, directory)
         os.mkdir(img_path)
         return img_path
 
 
 
-    def download_imgs(self, img_directory):
+    def download_imgs(self, img_directory, property_counter):
         '''Downloads the images for the property as a .jpg file with the image number as the image name
         '''
         property_img_list = self.property_dict['Property'][-1]['IMG links']
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
+            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'{self.property_dict["Property"][property_counter]["UID"]}_img_{file_count}')
             file_count += 1
 
 
@@ -251,23 +254,25 @@ class Scraper:
             self.create_data_files(uid_directory, property_counter)
             property_counter += 1
             print(f'Got info for property {property_counter}')
-        return uid_directory
+        return uid_directory, property_counter-1
     
 
 
-    def get_images(self, uid_directory):
+    def get_images(self, uid_directory, property_counter):
         img_directory = self.make_img_folder(uid_directory)
         print('Downloading images...')
-        self.download_imgs(img_directory)
+        self.download_imgs(img_directory, property_counter)
         print('Folders created and data stored')
+
+
 
 
 
 def scrape(url, driver):
     p = Scraper(url, driver)
     p.get_links()
-    uid_directory = p.get_info()
-    p.get_images(uid_directory)
+    uid_directory, property_counter = p.get_info()
+    p.get_images(uid_directory, property_counter)
 
 
 
