@@ -13,6 +13,7 @@ import urllib.request
 import json
 import boto3
 from sqlalchemy import create_engine
+import pandas as pd
 
 DATABASE_TYPE = 'postgresql'
 DBAPI = 'psycopg2'
@@ -35,7 +36,7 @@ class Scraper:
         self.driver = driver
         self.big_list = []
         self.property_dict = {'Property' : []}
-        # self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
+        self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
 
 
     def accept_cookies(self):
@@ -227,7 +228,7 @@ class Scraper:
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
             json.dump(current_property, outfile, indent= 4)
-        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
+        # s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
 
 
 
@@ -258,7 +259,7 @@ class Scraper:
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
+            # s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
             file_count += 1
 
 
@@ -342,13 +343,29 @@ class Scraper:
 
 
 
-    def upload_data_to_aws_rds(self, current_property):
+    def convert_to_dataframe(self, current_property):
+        '''Converts current property dictionary to panda dataframe
+        
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
+
+        Returns:
+            df: current_property as a pandas dataframe
+        '''
+        df = pd.DataFrame.from_dict(current_property)
+        return df
+
+
+
+    def upload_data_to_aws_rds(self, current_property, df):
         '''Uploads current property table to AWS RDS
         
         Args:
             current_property (dict): Dictionary containing keys and values of current property
+            df (pandas.core.frame.DataFrame): current_property as a pandas dataframe
         '''
         self.engine.connect()
+        df.to_sql(current_property['UID'], self.engine, if_exists='replace')
         
         
 
@@ -377,7 +394,8 @@ def scrape(url, driver):
         p.property_dict['Property'].append(current_property)
         uid_directory = p.create_json_files(current_property)
         p.get_images(uid_directory, current_property)
-        p.upload_data_to_aws_rds(current_property)
+        df = p.convert_to_dataframe(current_property)
+        p.upload_data_to_aws_rds(current_property, df)
         property_counter += 1
     print('\nFinished!')
 
