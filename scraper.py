@@ -1,3 +1,4 @@
+from audioop import add
 from multiprocessing.sharedctypes import Value
 from selenium import webdriver
 import uuid
@@ -11,20 +12,31 @@ import shutil
 import urllib.request
 import json
 import boto3
+from sqlalchemy import create_engine
+import pandas as pd
+
+DATABASE_TYPE = 'postgresql'
+DBAPI = 'psycopg2'
+ENDPOINT = 'database-1.c525llniltka.eu-west-2.rds.amazonaws.com'
+USER = 'postgres'
+PASSWORD = 'shamasam1'
+PORT = 5432
+DATABASE = 'postgres'
+
+
 
 s3_client = boto3.client('s3')
 
 class Scraper:
     '''Scrapes a website for desired information
     '''
-
        
     def __init__(self, url, driver):
         self.url = url
         self.driver = driver
         self.big_list = []
         self.property_dict = {'Property' : []}
-        
+        self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
 
 
     def accept_cookies(self):
@@ -34,7 +46,6 @@ class Scraper:
         self.driver.switch_to.frame('gdpr-consent-notice')
         accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
         accept_cookies_button.click()
-        return self.driver
 
 
     def search_ng8(self):
@@ -57,6 +68,9 @@ class Scraper:
 
     def get_property_links(self):
         '''Gets the links to all the properties on the current page
+
+        Returns:
+            list: list of property links
         '''
         property_list = []
         properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 4]')))
@@ -72,6 +86,9 @@ class Scraper:
 
     def get_unique_id(self):
         '''Assigns a unique ID for each property from the ID given in the URL and appends to the dictionary
+
+        Returns:
+            str: string of numbers to be used as unique identifier
         '''
         unique_id = self.url.split('/')[5]
         return unique_id
@@ -80,6 +97,9 @@ class Scraper:
 
     def get_uuid(self):
         '''Generates a random Universally Unique ID (UUID) for each property and appends to the dictionary
+
+        Returns:
+            str: string to be used as universally unique identifier
         '''
         uni_uid = str(uuid.uuid4())
         return uni_uid
@@ -88,6 +108,9 @@ class Scraper:
 
     def get_property_img(self):
         '''Generates a list of links for all the images for the current property and appends to the dictionary
+
+        Returns:
+            list: list of links for each image of property
         '''
         property_img_list = []
         next_img = self.driver.find_element(By.XPATH, '//main/div/div/section//button[@aria-label= "Next image"]')
@@ -103,6 +126,11 @@ class Scraper:
 
 
     def get_price(self, error_msg, info_container):
+        '''Gets the price attribute of the property
+
+        Returns:
+            str: price of property
+        '''
         try:
             price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
             return price
@@ -112,6 +140,11 @@ class Scraper:
 
 
     def get_description(self, error_msg, info_container):
+        '''Gets description of property
+        
+        Returns:
+            str: description of property
+        '''
         try:
             description = info_container.find_element(By.XPATH, './div//*[text()[contains(., "for")]]').text
             return description
@@ -121,6 +154,11 @@ class Scraper:
 
 
     def get_bathrooms(self, error_msg, info_container):
+        '''Gets number of bathrooms of property
+        
+        Returns:
+            str: number of bathrooms of property
+        '''
         try:
             bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
             return bathroom
@@ -130,6 +168,11 @@ class Scraper:
 
 
     def get_address(self, error_msg, info_container):
+        '''Gets address of property
+        
+        Returns:
+            str: address of property
+        '''
         try:
             address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
             return address
@@ -149,41 +192,54 @@ class Scraper:
     def create_raw_data_folder(self):
         '''Deletes existing raw_data folder and generates new one
         '''
+        dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         try:
-            dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
             shutil.rmtree(dir)
         except:
             pass
-        directory = 'raw_data'
-        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/'
-        path = os.path.join(parent_dir, directory)
-        os.mkdir(path)
+        os.mkdir(dir)
         print('raw_data directory created')
 
 
 
-    def create_id_folders(self, property_counter):
+    def create_id_folders(self, current_property):
         '''Creates folders in the raw_data folder for each property. The name of each folder is the UID generated earlier
+
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
+
+        Returns:
+            str: path to current property directory
         '''
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
-        directory = self.property_dict['Property'][property_counter]['UID']
+        directory = current_property['UID']
         uid_directory = os.path.join(parent_dir, directory)
         os.mkdir(uid_directory)
         return uid_directory
 
 
 
-    def create_data_files(self, uid_directory, property_counter):
+    def create_data_files(self, uid_directory, current_property):
         '''Inside the relevant property folder, creates a file 'data.json' containing information obtained for the property
+
+        Args:
+            uid_directory (str): path to current property directory
+            current_property (dict): Dictionary containing keys and values of current property
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
-            json.dump(self.property_dict['Property'][property_counter], outfile, indent= 4)
-        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'{self.property_dict["Property"][property_counter]["UID"]}_data')
+            json.dump(current_property, outfile, indent= 4)
+        # s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
 
 
 
     def make_img_folder(self, uid_directory):
         '''Inside the relevant property folder, creates a folder named 'images' to store property images
+
+        Args:
+            uid_directory (str): path to current property directory
+
+        Returns:
+            img_path (str): path to current property's image directory
         '''
         directory = 'Images'
         img_path = os.path.join(uid_directory, directory)
@@ -192,19 +248,25 @@ class Scraper:
 
 
 
-    def download_imgs(self, img_directory, property_counter):
+    def download_imgs(self, img_directory, current_property):
         '''Downloads the images for the property as a .jpg file with the image number as the image name
+
+        Args:
+            img_directory (str): path to directory in which property images are stored
+            current_property (dict): Dictionary containing keys and values of current property
         '''
-        property_img_list = self.property_dict['Property'][-1]['IMG links']
+        property_img_list = current_property['IMG links']
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'{self.property_dict["Property"][property_counter]["UID"]}_img_{file_count}')
+            # s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
             file_count += 1
 
 
 
     def get_links(self):
+        '''Runs the part of the script related to getting property links
+        '''
         self.driver.get(self.url)
         # self.driver.maximize_window()
         time.sleep(2)
@@ -228,51 +290,114 @@ class Scraper:
 
 
     def get_info(self):
-        property_counter = 0
+        '''Runs the part of the code related to getting the property information.
+
+        Returns:
+        price: price of the property
+        description: description of the property
+        bathrooms: number of bathrooms of the property
+        address: address of the property
+        img: list of images of property
+        uid: unique identifier of property (from URL)
+        uni_uid: universally unique id (uuid) of property
+        '''
         error_msg = 'N/A'
-        self.create_raw_data_folder()
-        for property in self.big_list:
-            self.url = property
-            time.sleep(1)
-            self.driver.get(self.url)
-            time.sleep(1)
-            info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
-            price = self.get_price(error_msg, info_container)
-            description = self.get_description(error_msg, info_container)
-            bathrooms = self.get_bathrooms(error_msg, info_container)
-            address = self.get_address(error_msg, info_container)
-            img = self.get_property_img()
-            uid = self.get_unique_id()
-            uni_uid = self.get_uuid()
+        info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
+        price = self.get_price(error_msg, info_container)
+        description = self.get_description(error_msg, info_container)
+        bathrooms = self.get_bathrooms(error_msg, info_container)
+        address = self.get_address(error_msg, info_container)
+        img = self.get_property_img()
+        uid = self.get_unique_id()
+        uni_uid = self.get_uuid()
+        return price, description, bathrooms, address, img, uid, uni_uid
 
-            current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
-            'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
 
-            self.property_dict['Property'].append(current_property)
 
-            uid_directory = self.create_id_folders(property_counter)
-            self.create_data_files(uid_directory, property_counter)
-            property_counter += 1
-            print(f'Got info for property {property_counter}')
-        return uid_directory, property_counter-1
+    def create_json_files(self, current_property):
+        '''Creates folders for each property and creates data.json files within each folder
+        
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
+        
+        Returns:
+            uid_directory (str): path to current property directory
+        '''
+        uid_directory = self.create_id_folders(current_property)
+        self.create_data_files(uid_directory, current_property)
+        return uid_directory
     
 
 
-    def get_images(self, uid_directory, property_counter):
+    def get_images(self, uid_directory, current_property):
+        '''Runs the part of the code related to downloading property images into their relevant directories
+
+        Args:
+            uid_directory (str): path to current property directory
+            current_property (dict): Dictionary containing keys and values of current property
+        '''
         img_directory = self.make_img_folder(uid_directory)
         print('Downloading images...')
-        self.download_imgs(img_directory, property_counter)
+        self.download_imgs(img_directory, current_property)
         print('Folders created and data stored')
 
 
 
+    def convert_to_dataframe(self, current_property):
+        '''Converts current property dictionary to panda dataframe
+        
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
 
+        Returns:
+            df: current_property as a pandas dataframe
+        '''
+        df = pd.DataFrame.from_dict(current_property)
+        return df
+
+
+
+    def upload_data_to_aws_rds(self, current_property, df):
+        '''Uploads current property table to AWS RDS
+        
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
+            df (pandas.core.frame.DataFrame): current_property as a pandas dataframe
+        '''
+        self.engine.connect()
+        df.to_sql(current_property['UID'], self.engine, if_exists='replace')
+        
+        
 
 def scrape(url, driver):
+    '''The block of code that runs the entire scraper
+    
+    Args:
+        url (str): initial url of the scraper
+        driver (selenium.webdriver.chrome.webdriver.WebDriver): uses Chrome webdriver for automated browsing
+    '''
     p = Scraper(url, driver)
+    p.create_raw_data_folder()
     p.get_links()
-    uid_directory, property_counter = p.get_info()
-    p.get_images(uid_directory, property_counter)
+    property_counter = 1
+    for property in p.big_list:
+        p.url = property
+        time.sleep(1)
+        p.driver.get(p.url)
+        time.sleep(1)
+        price, description, bathrooms, address, img, uid, uni_uid = p.get_info()
+        print(f'Got info for property {property_counter}')
+        
+        current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
+        'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
+
+        p.property_dict['Property'].append(current_property)
+        uid_directory = p.create_json_files(current_property)
+        p.get_images(uid_directory, current_property)
+        df = p.convert_to_dataframe(current_property)
+        p.upload_data_to_aws_rds(current_property, df)
+        property_counter += 1
+    print('\nFinished!')
 
 
 
