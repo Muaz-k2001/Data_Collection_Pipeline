@@ -1,3 +1,4 @@
+from audioop import add
 from multiprocessing.sharedctypes import Value
 from selenium import webdriver
 import uuid
@@ -11,20 +12,30 @@ import shutil
 import urllib.request
 import json
 import boto3
+from sqlalchemy import create_engine
+
+DATABASE_TYPE = 'postgresql'
+DBAPI = 'psycopg2'
+ENDPOINT = 'database-1.c525llniltka.eu-west-2.rds.amazonaws.com'
+USER = 'postgres'
+PASSWORD = 'shamasam1'
+PORT = 5432
+DATABASE = 'postgres'
+
+
 
 s3_client = boto3.client('s3')
 
 class Scraper:
     '''Scrapes a website for desired information
     '''
-
        
     def __init__(self, url, driver):
         self.url = url
         self.driver = driver
         self.big_list = []
         self.property_dict = {'Property' : []}
-        
+        # self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
 
 
     def accept_cookies(self):
@@ -121,7 +132,6 @@ class Scraper:
         '''
         try:
             price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
-            print(type(price))
             return price
         except:
             return error_msg
@@ -181,46 +191,43 @@ class Scraper:
     def create_raw_data_folder(self):
         '''Deletes existing raw_data folder and generates new one
         '''
+        dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         try:
-            dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
             shutil.rmtree(dir)
         except:
             pass
-        directory = 'raw_data'
-        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/'
-        path = os.path.join(parent_dir, directory)
-        os.mkdir(path)
+        os.mkdir(dir)
         print('raw_data directory created')
 
 
 
-    def create_id_folders(self, property_counter):
+    def create_id_folders(self, current_property):
         '''Creates folders in the raw_data folder for each property. The name of each folder is the UID generated earlier
 
         Args:
-            property_counter (int): position of property in order of getting info
+            current_property (dict): Dictionary containing keys and values of current property
 
         Returns:
             str: path to current property directory
         '''
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
-        directory = self.property_dict['Property'][property_counter]['UID']
+        directory = current_property['UID']
         uid_directory = os.path.join(parent_dir, directory)
         os.mkdir(uid_directory)
         return uid_directory
 
 
 
-    def create_data_files(self, uid_directory, property_counter):
+    def create_data_files(self, uid_directory, current_property):
         '''Inside the relevant property folder, creates a file 'data.json' containing information obtained for the property
 
         Args:
             uid_directory (str): path to current property directory
-            property_counter (int): position of property in order of getting info
+            current_property (dict): Dictionary containing keys and values of current property
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
-            json.dump(self.property_dict['Property'][property_counter], outfile, indent= 4)
-        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{self.property_dict["Property"][property_counter]["UID"]}')
+            json.dump(current_property, outfile, indent= 4)
+        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
 
 
 
@@ -229,6 +236,9 @@ class Scraper:
 
         Args:
             uid_directory (str): path to current property directory
+
+        Returns:
+            img_path (str): path to current property's image directory
         '''
         directory = 'Images'
         img_path = os.path.join(uid_directory, directory)
@@ -237,18 +247,18 @@ class Scraper:
 
 
 
-    def download_imgs(self, img_directory, property_counter):
+    def download_imgs(self, img_directory, current_property):
         '''Downloads the images for the property as a .jpg file with the image number as the image name
 
         Args:
             img_directory (str): path to directory in which property images are stored
-            property_counter (int): position of property in order of getting info
+            current_property (dict): Dictionary containing keys and values of current property
         '''
-        property_img_list = self.property_dict['Property'][-1]['IMG links']
+        property_img_list = current_property['IMG links']
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{self.property_dict["Property"][property_counter]["UID"]}_{file_count}')
+            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
             file_count += 1
 
 
@@ -279,56 +289,97 @@ class Scraper:
 
 
     def get_info(self):
-        '''Runs the part of the code related to getting the property information. Also calls the get_images() function within the loop
+        '''Runs the part of the code related to getting the property information.
+
+        Returns:
+        price: price of the property
+        description: description of the property
+        bathrooms: number of bathrooms of the property
+        address: address of the property
+        img: list of images of property
+        uid: unique identifier of property (from URL)
+        uni_uid: universally unique id (uuid) of property
         '''
-        property_counter = 0
         error_msg = 'N/A'
-        self.create_raw_data_folder()
-        for property in self.big_list:
-            self.url = property
-            time.sleep(1)
-            self.driver.get(self.url)
-            time.sleep(1)
-            info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
-            price = self.get_price(error_msg, info_container)
-            description = self.get_description(error_msg, info_container)
-            bathrooms = self.get_bathrooms(error_msg, info_container)
-            address = self.get_address(error_msg, info_container)
-            img = self.get_property_img()
-            uid = self.get_unique_id()
-            uni_uid = self.get_uuid()
+        info_container = self.driver.find_element(By.XPATH, '//*[@data-testid= "listing-summary-details"]')
+        price = self.get_price(error_msg, info_container)
+        description = self.get_description(error_msg, info_container)
+        bathrooms = self.get_bathrooms(error_msg, info_container)
+        address = self.get_address(error_msg, info_container)
+        img = self.get_property_img()
+        uid = self.get_unique_id()
+        uni_uid = self.get_uuid()
+        return price, description, bathrooms, address, img, uid, uni_uid
 
-            current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
-            'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
 
-            self.property_dict['Property'].append(current_property)
 
-            uid_directory = self.create_id_folders(property_counter)
-            self.create_data_files(uid_directory, property_counter)
-            # self.get_images(uid_directory, property_counter)
-            property_counter += 1
-            print(f'Got info for property {property_counter}')
+    def create_json_files(self, current_property):
+        '''Creates folders for each property and creates data.json files within each folder
+        
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
+        
+        Returns:
+            uid_directory (str): path to current property directory
+        '''
+        uid_directory = self.create_id_folders(current_property)
+        self.create_data_files(uid_directory, current_property)
+        return uid_directory
     
 
 
-    def get_images(self, uid_directory, property_counter):
+    def get_images(self, uid_directory, current_property):
         '''Runs the part of the code related to downloading property images into their relevant directories
 
         Args:
             uid_directory (str): path to current property directory
-            property_counter (int): position of property in order of getting info
+            current_property (dict): Dictionary containing keys and values of current property
         '''
         img_directory = self.make_img_folder(uid_directory)
         print('Downloading images...')
-        self.download_imgs(img_directory, property_counter)
+        self.download_imgs(img_directory, current_property)
         print('Folders created and data stored')
 
 
 
+    def upload_data_to_aws_rds(self, current_property):
+        '''Uploads current property table to AWS RDS
+        
+        Args:
+            current_property (dict): Dictionary containing keys and values of current property
+        '''
+        self.engine.connect()
+        
+        
+
 def scrape(url, driver):
+    '''The block of code that runs the entire scraper
+    
+    Args:
+        url (str): initial url of the scraper
+        driver (selenium.webdriver.chrome.webdriver.WebDriver): uses Chrome webdriver for automated browsing
+    '''
     p = Scraper(url, driver)
+    p.create_raw_data_folder()
     p.get_links()
-    p.get_info()
+    property_counter = 1
+    for property in p.big_list:
+        p.url = property
+        time.sleep(1)
+        p.driver.get(p.url)
+        time.sleep(1)
+        price, description, bathrooms, address, img, uid, uni_uid = p.get_info()
+        print(f'Got info for property {property_counter}')
+        
+        current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
+        'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
+
+        p.property_dict['Property'].append(current_property)
+        uid_directory = p.create_json_files(current_property)
+        p.get_images(uid_directory, current_property)
+        p.upload_data_to_aws_rds(current_property)
+        property_counter += 1
+    print('\nFinished!')
 
 
 
