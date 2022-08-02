@@ -34,7 +34,6 @@ class Scraper:
         self.driver.switch_to.frame('gdpr-consent-notice')
         accept_cookies_button = WebDriverWait(self.driver, 100).until(EC.presence_of_element_located((By.XPATH, '//*[@id= "save"]')))
         accept_cookies_button.click()
-        return self.driver
 
 
     def search_ng8(self):
@@ -57,6 +56,9 @@ class Scraper:
 
     def get_property_links(self):
         '''Gets the links to all the properties on the current page
+
+        Returns:
+            list: list of property links
         '''
         property_list = []
         properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 4]')))
@@ -72,6 +74,9 @@ class Scraper:
 
     def get_unique_id(self):
         '''Assigns a unique ID for each property from the ID given in the URL and appends to the dictionary
+
+        Returns:
+            str: string of numbers to be used as unique identifier
         '''
         unique_id = self.url.split('/')[5]
         return unique_id
@@ -80,6 +85,9 @@ class Scraper:
 
     def get_uuid(self):
         '''Generates a random Universally Unique ID (UUID) for each property and appends to the dictionary
+
+        Returns:
+            str: string to be used as universally unique identifier
         '''
         uni_uid = str(uuid.uuid4())
         return uni_uid
@@ -88,6 +96,9 @@ class Scraper:
 
     def get_property_img(self):
         '''Generates a list of links for all the images for the current property and appends to the dictionary
+
+        Returns:
+            list: list of links for each image of property
         '''
         property_img_list = []
         next_img = self.driver.find_element(By.XPATH, '//main/div/div/section//button[@aria-label= "Next image"]')
@@ -103,8 +114,14 @@ class Scraper:
 
 
     def get_price(self, error_msg, info_container):
+        '''Gets the price attribute of the property
+
+        Returns:
+            str: price of property
+        '''
         try:
             price = info_container.find_element(By.XPATH, '//*[@data-testid= "price"]').text
+            print(type(price))
             return price
         except:
             return error_msg
@@ -112,6 +129,11 @@ class Scraper:
 
 
     def get_description(self, error_msg, info_container):
+        '''Gets description of property
+        
+        Returns:
+            str: description of property
+        '''
         try:
             description = info_container.find_element(By.XPATH, './div//*[text()[contains(., "for")]]').text
             return description
@@ -121,6 +143,11 @@ class Scraper:
 
 
     def get_bathrooms(self, error_msg, info_container):
+        '''Gets number of bathrooms of property
+        
+        Returns:
+            str: number of bathrooms of property
+        '''
         try:
             bathroom = info_container.find_element(By.XPATH, './div//*[text()[contains(., "bath")]]').text
             return bathroom
@@ -130,6 +157,11 @@ class Scraper:
 
 
     def get_address(self, error_msg, info_container):
+        '''Gets address of property
+        
+        Returns:
+            str: address of property
+        '''
         try:
             address = info_container.find_element(By.XPATH, '//*[@data-testid= "address-label"]').text
             return address
@@ -164,6 +196,12 @@ class Scraper:
 
     def create_id_folders(self, property_counter):
         '''Creates folders in the raw_data folder for each property. The name of each folder is the UID generated earlier
+
+        Args:
+            property_counter (int): position of property in order of getting info
+
+        Returns:
+            str: path to current property directory
         '''
         parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
         directory = self.property_dict['Property'][property_counter]['UID']
@@ -175,15 +213,22 @@ class Scraper:
 
     def create_data_files(self, uid_directory, property_counter):
         '''Inside the relevant property folder, creates a file 'data.json' containing information obtained for the property
+
+        Args:
+            uid_directory (str): path to current property directory
+            property_counter (int): position of property in order of getting info
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
             json.dump(self.property_dict['Property'][property_counter], outfile, indent= 4)
-        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'{self.property_dict["Property"][property_counter]["UID"]}_data')
+        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{self.property_dict["Property"][property_counter]["UID"]}')
 
 
 
     def make_img_folder(self, uid_directory):
         '''Inside the relevant property folder, creates a folder named 'images' to store property images
+
+        Args:
+            uid_directory (str): path to current property directory
         '''
         directory = 'Images'
         img_path = os.path.join(uid_directory, directory)
@@ -194,17 +239,23 @@ class Scraper:
 
     def download_imgs(self, img_directory, property_counter):
         '''Downloads the images for the property as a .jpg file with the image number as the image name
+
+        Args:
+            img_directory (str): path to directory in which property images are stored
+            property_counter (int): position of property in order of getting info
         '''
         property_img_list = self.property_dict['Property'][-1]['IMG links']
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'{self.property_dict["Property"][property_counter]["UID"]}_img_{file_count}')
+            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{self.property_dict["Property"][property_counter]["UID"]}_{file_count}')
             file_count += 1
 
 
 
     def get_links(self):
+        '''Runs the part of the script related to getting property links
+        '''
         self.driver.get(self.url)
         # self.driver.maximize_window()
         time.sleep(2)
@@ -228,6 +279,8 @@ class Scraper:
 
 
     def get_info(self):
+        '''Runs the part of the code related to getting the property information. Also calls the get_images() function within the loop
+        '''
         property_counter = 0
         error_msg = 'N/A'
         self.create_raw_data_folder()
@@ -252,13 +305,19 @@ class Scraper:
 
             uid_directory = self.create_id_folders(property_counter)
             self.create_data_files(uid_directory, property_counter)
+            # self.get_images(uid_directory, property_counter)
             property_counter += 1
             print(f'Got info for property {property_counter}')
-        return uid_directory, property_counter-1
     
 
 
     def get_images(self, uid_directory, property_counter):
+        '''Runs the part of the code related to downloading property images into their relevant directories
+
+        Args:
+            uid_directory (str): path to current property directory
+            property_counter (int): position of property in order of getting info
+        '''
         img_directory = self.make_img_folder(uid_directory)
         print('Downloading images...')
         self.download_imgs(img_directory, property_counter)
@@ -266,13 +325,10 @@ class Scraper:
 
 
 
-
-
 def scrape(url, driver):
     p = Scraper(url, driver)
     p.get_links()
-    uid_directory, property_counter = p.get_info()
-    p.get_images(uid_directory, property_counter)
+    p.get_info()
 
 
 
