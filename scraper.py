@@ -23,9 +23,11 @@ PASSWORD = 'shamasam1'
 PORT = 5432
 DATABASE = 'postgres'
 
-
-
 s3_client = boto3.client('s3')
+s3 = boto3.resource('s3')
+bucket = s3.Bucket('muazaicoredcp')
+
+
 
 class Scraper:
     '''Scrapes a website for desired information
@@ -228,7 +230,7 @@ class Scraper:
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
             json.dump(current_property, outfile, indent= 4)
-        # s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
+        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
 
 
 
@@ -259,7 +261,7 @@ class Scraper:
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            # s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
+            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
             file_count += 1
 
 
@@ -377,6 +379,8 @@ def scrape(url, driver):
         driver (selenium.webdriver.chrome.webdriver.WebDriver): uses Chrome webdriver for automated browsing
     '''
     p = Scraper(url, driver)
+    bucket.objects.all().delete()
+    print('Bucket cleared')
     p.create_raw_data_folder()
     p.get_links()
     property_counter = 1
@@ -386,7 +390,6 @@ def scrape(url, driver):
         p.driver.get(p.url)
         time.sleep(1)
         price, description, bathrooms, address, img, uid, uni_uid = p.get_info()
-        print(f'Got info for property {property_counter}')
         
         current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
         'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
@@ -394,9 +397,12 @@ def scrape(url, driver):
         p.property_dict['Property'].append(current_property)
         uid_directory = p.create_json_files(current_property)
         p.get_images(uid_directory, current_property)
+        print(f'Got info for property {property_counter}')
         df = p.convert_to_dataframe(current_property)
         p.upload_data_to_aws_rds(current_property, df)
+        print('Uploaded to RDS')
         property_counter += 1
+    driver.close()
     print('\nFinished!')
 
 

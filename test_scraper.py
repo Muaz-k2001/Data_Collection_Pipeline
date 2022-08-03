@@ -7,7 +7,7 @@ from selenium.common.exceptions import NoSuchElementException
 import time
 import os
 import json
-
+import boto3
 
 class ScraperTestCase(unittest.TestCase):
 
@@ -49,7 +49,12 @@ class ScraperTestCase(unittest.TestCase):
             assert True
 
     def test_data_file_contents(self):
-        uid_directory = self.scraper.get_info()
+        self.scraper.url = self.scraper.big_list[0]
+        time.sleep(2)
+        self.scraper.driver.get(self.scraper.url)
+        time.sleep(2) 
+        uid = self.scraper.get_unique_id
+        uid_directory = f'/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/{uid}'
         with open (f'{uid_directory}/data.json') as json_file:
             data = json.load(json_file)
         if 'Link' and 'Price' and 'Description' and 'Bathrooms' and 'Address' and 'IMG links' and 'UID' and 'UUID' in data:
@@ -58,12 +63,37 @@ class ScraperTestCase(unittest.TestCase):
             assert False
         
     def test_images_downloaded(self):
-        uid_directory = self.scraper.get_info()
-        self.scraper.get_images(uid_directory)
+        self.scraper.url = self.scraper.big_list[0]
+        time.sleep(2)
+        self.scraper.driver.get(self.scraper.url) 
+        time.sleep(2)
+        price, description, bathrooms, address, img, uid, uni_uid = self.scraper.get_info()
+        current_property = {'Link' : self.scraper.url, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
+        'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
+        uid_directory = f'/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/{current_property["UID"]}'
         img_dir = f'{uid_directory}/Images/'
-        expected = len(self.scraper.property_dict['Property'][-1]['IMG links'])
-        actual = (len([name for name in os.listdir(img_dir) if os.path.isfile(os.path.join(img_dir, name))]))
+        expected = len(current_property['IMG links'])
+        actual = len([name for name in os.listdir(img_dir) if os.path.isfile(os.path.join(img_dir, name))])
         self.assertEqual(expected, actual)
+
+    def test_bucket_contents(self):
+        s3 = boto3.resource('s3')
+        bucket = s3.Bucket('muazaicoredcp')
+        bucket_list = []
+        for obj in bucket.objects.all():
+            bucket_list.append(obj)
+        dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
+        names = [n for n in os.listdir(dir) if os.path.isdir(os.path.join(dir, n))]
+        img_file_count = 0
+        data_file_count = 0
+        for name in names:
+            img_dir = f'{dir}{name}/Images'
+            img_file_count += len([f for f in os.listdir(img_dir) if os.path.isfile(os.path.join(img_dir, f))])
+            data_file_count += 1
+        expected = img_file_count + data_file_count
+        actual = len(bucket_list)
+        self.assertEqual(expected, actual)
+
 
 
 
