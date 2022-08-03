@@ -23,9 +23,11 @@ PASSWORD = 'shamasam1'
 PORT = 5432
 DATABASE = 'postgres'
 
-
-
 s3_client = boto3.client('s3')
+s3 = boto3.resource('s3')
+bucket = s3.Bucket('muazaicoredcp')
+
+
 
 class Scraper:
     '''Scrapes a website for desired information
@@ -37,6 +39,7 @@ class Scraper:
         self.big_list = []
         self.property_dict = {'Property' : []}
         self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
+        self.scraped_property_id = []
 
 
     def accept_cookies(self):
@@ -73,7 +76,7 @@ class Scraper:
             list: list of property links
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 4]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -90,8 +93,8 @@ class Scraper:
         Returns:
             str: string of numbers to be used as unique identifier
         '''
-        unique_id = self.url.split('/')[5]
-        return unique_id
+        uid = self.url.split('/')[5]
+        return uid
 
 
 
@@ -228,7 +231,7 @@ class Scraper:
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
             json.dump(current_property, outfile, indent= 4)
-        # s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
+        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
 
 
 
@@ -259,7 +262,7 @@ class Scraper:
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            # s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
+            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
             file_count += 1
 
 
@@ -274,15 +277,15 @@ class Scraper:
         time.sleep(2)
         self.search_ng8()
         time.sleep(3)
-        # page_counter = 1
-        # while page_counter < 5:
-        #     if page_counter == 2:
-        #         self.close_email_popup()
-        #     property_list = self.get_property_links()
-        #     self.big_list.extend(property_list)
-        #     self.change_page()
-        #     time.sleep(1)
-        #     page_counter += 1
+        page_counter = 1
+        while page_counter < 5:
+            if page_counter == 2:
+                self.close_email_popup()
+            property_list = self.get_property_links()
+            self.big_list.extend(property_list)
+            self.change_page()
+            time.sleep(1)
+            page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
@@ -377,6 +380,8 @@ def scrape(url, driver):
         driver (selenium.webdriver.chrome.webdriver.WebDriver): uses Chrome webdriver for automated browsing
     '''
     p = Scraper(url, driver)
+    bucket.objects.all().delete()
+    print('Bucket cleared')
     p.create_raw_data_folder()
     p.get_links()
     property_counter = 1
@@ -386,17 +391,25 @@ def scrape(url, driver):
         p.driver.get(p.url)
         time.sleep(1)
         price, description, bathrooms, address, img, uid, uni_uid = p.get_info()
-        print(f'Got info for property {property_counter}')
         
         current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
         'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
 
+        if uid in p.scraped_property_id:
+            print(f'Already scraped {uid}')
+            continue
+        else:
+            p.scraped_property_id.append(uid)
         p.property_dict['Property'].append(current_property)
+        print(p.scraped_property_id)
         uid_directory = p.create_json_files(current_property)
         p.get_images(uid_directory, current_property)
+        print(f'Got info for property {property_counter}')
         df = p.convert_to_dataframe(current_property)
         p.upload_data_to_aws_rds(current_property, df)
+        print('Uploaded to RDS')
         property_counter += 1
+    driver.close()
     print('\nFinished!')
 
 
