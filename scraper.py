@@ -39,6 +39,7 @@ class Scraper:
         self.big_list = []
         self.property_dict = {'Property' : []}
         self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
+        self.scraped_property_id = []
 
 
     def accept_cookies(self):
@@ -75,7 +76,7 @@ class Scraper:
             list: list of property links
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 4]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -92,8 +93,8 @@ class Scraper:
         Returns:
             str: string of numbers to be used as unique identifier
         '''
-        unique_id = self.url.split('/')[5]
-        return unique_id
+        uid = self.url.split('/')[5]
+        return uid
 
 
 
@@ -276,15 +277,15 @@ class Scraper:
         time.sleep(2)
         self.search_ng8()
         time.sleep(3)
-        # page_counter = 1
-        # while page_counter < 5:
-        #     if page_counter == 2:
-        #         self.close_email_popup()
-        #     property_list = self.get_property_links()
-        #     self.big_list.extend(property_list)
-        #     self.change_page()
-        #     time.sleep(1)
-        #     page_counter += 1
+        page_counter = 1
+        while page_counter < 5:
+            if page_counter == 2:
+                self.close_email_popup()
+            property_list = self.get_property_links()
+            self.big_list.extend(property_list)
+            self.change_page()
+            time.sleep(1)
+            page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
@@ -394,7 +395,13 @@ def scrape(url, driver):
         current_property = {'Link' : property, 'Price' : price, 'Description' : description, 'Bathrooms' : bathrooms,
         'Address' : address, 'IMG links' : img, 'UID' : uid, 'UUID' : uni_uid}
 
+        if uid in p.scraped_property_id:
+            print(f'Already scraped {uid}')
+            continue
+        else:
+            p.scraped_property_id.append(uid)
         p.property_dict['Property'].append(current_property)
+        print(p.scraped_property_id)
         uid_directory = p.create_json_files(current_property)
         p.get_images(uid_directory, current_property)
         print(f'Got info for property {property_counter}')
