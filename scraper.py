@@ -1,19 +1,20 @@
 from audioop import add
 from multiprocessing.sharedctypes import Value
 from selenium import webdriver
-import uuid
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
-import time
-import os
-import shutil
-import urllib.request
-import json
-import boto3
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from sqlalchemy import create_engine
+import boto3
+import json
+import os
 import pandas as pd
+import shutil
+import time
+import urllib.request
+import uuid
 
 DATABASE_TYPE = 'postgresql'
 DBAPI = 'psycopg2'
@@ -76,7 +77,7 @@ class Scraper:
             list: list of property links
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 11]')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -231,7 +232,7 @@ class Scraper:
         '''
         with open(os.path.join(uid_directory, 'data.json'), 'a+') as outfile:
             json.dump(current_property, outfile, indent= 4)
-        s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
+        # s3_client.upload_file(f'{uid_directory}/data.json', 'muazaicoredcp', f'data_{current_property["UID"]}')
 
 
 
@@ -262,7 +263,7 @@ class Scraper:
         file_count = 1
         for img in property_img_list:
             urllib.request.urlretrieve(img, f'{img_directory}/img_{file_count}.jpg')
-            s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
+            # s3_client.upload_file(f'{img_directory}/img_{file_count}.jpg', 'muazaicoredcp', f'img_{current_property["UID"]}_{file_count}')
             file_count += 1
 
 
@@ -270,22 +271,20 @@ class Scraper:
     def get_links(self):
         '''Runs the part of the script related to getting property links
         '''
-        self.driver.get(self.url)
-        # self.driver.maximize_window()
         time.sleep(2)
         self.accept_cookies()
         time.sleep(2)
         self.search_ng8()
         time.sleep(3)
-        page_counter = 1
-        while page_counter < 5:
-            if page_counter == 2:
-                self.close_email_popup()
-            property_list = self.get_property_links()
-            self.big_list.extend(property_list)
-            self.change_page()
-            time.sleep(1)
-            page_counter += 1
+        # page_counter = 1
+        # while page_counter < 5:
+        #     if page_counter == 2:
+        #         self.close_email_popup()
+        #     property_list = self.get_property_links()
+        #     self.big_list.extend(property_list)
+        #     self.change_page()
+        #     time.sleep(1)
+        #     page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
@@ -346,20 +345,6 @@ class Scraper:
 
 
 
-    def convert_to_dataframe(self, current_property):
-        '''Converts current property dictionary to panda dataframe
-        
-        Args:
-            current_property (dict): Dictionary containing keys and values of current property
-
-        Returns:
-            df: current_property as a pandas dataframe
-        '''
-        df = pd.DataFrame.from_dict(current_property)
-        return df
-
-
-
     def upload_data_to_aws_rds(self, current_property, df):
         '''Uploads current property table to AWS RDS
         
@@ -380,9 +365,10 @@ def scrape(url, driver):
         driver (selenium.webdriver.chrome.webdriver.WebDriver): uses Chrome webdriver for automated browsing
     '''
     p = Scraper(url, driver)
-    bucket.objects.all().delete()
-    print('Bucket cleared')
+    # bucket.objects.all().delete()
+    # print('Bucket cleared')
     p.create_raw_data_folder()
+    p.driver.get(p.url)
     p.get_links()
     property_counter = 1
     for property in p.big_list:
@@ -401,14 +387,14 @@ def scrape(url, driver):
         else:
             p.scraped_property_id.append(uid)
         p.property_dict['Property'].append(current_property)
-        print(p.scraped_property_id)
         uid_directory = p.create_json_files(current_property)
         p.get_images(uid_directory, current_property)
         print(f'Got info for property {property_counter}')
-        df = p.convert_to_dataframe(current_property)
-        p.upload_data_to_aws_rds(current_property, df)
         print('Uploaded to RDS')
         property_counter += 1
+    df = pd.DataFrame.from_dict(p.property_dict['Property'])
+    p.engine.connect()
+    df.to_sql('PropertyTable', p.engine, if_exists='replace')
     driver.close()
     print('\nFinished!')
 
@@ -416,5 +402,7 @@ def scrape(url, driver):
 
 if __name__ == '__main__':
     url = 'https://www.zoopla.co.uk/'
-    driver = webdriver.Chrome()
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    driver = webdriver.Chrome(options=chrome_options)
     scrape(url, driver)
