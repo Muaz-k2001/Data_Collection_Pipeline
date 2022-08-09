@@ -16,17 +16,17 @@ import time
 import urllib.request
 import uuid
 
-DATABASE_TYPE = 'postgresql'
-DBAPI = 'psycopg2'
-ENDPOINT = 'database-1.c525llniltka.eu-west-2.rds.amazonaws.com'
-USER = 'postgres'
-PASSWORD = 'shamasam1'
-PORT = 5432
-DATABASE = 'postgres'
+# DATABASE_TYPE = 'postgresql'
+# DBAPI = 'psycopg2'
+# ENDPOINT = 'database-1.c525llniltka.eu-west-2.rds.amazonaws.com'
+# USER = 'postgres'
+# PASSWORD = 'shamasam1'
+# PORT = 5432
+# DATABASE = 'postgres'
 
-s3_client = boto3.client('s3')
-s3 = boto3.resource('s3')
-bucket = s3.Bucket('muazaicoredcp')
+# s3_client = boto3.client('s3')
+# s3 = boto3.resource('s3')
+# bucket = s3.Bucket('muazaicoredcp')
 
 
 
@@ -39,7 +39,7 @@ class Scraper:
         self.driver = driver
         self.big_list = []
         self.property_dict = {'Property' : []}
-        self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
+        # self.engine = create_engine(f"{DATABASE_TYPE}+{DBAPI}://{USER}:{PASSWORD}@{ENDPOINT}:{PORT}/{DATABASE}")
         self.scraped_property_id = []
 
 
@@ -77,7 +77,7 @@ class Scraper:
             list: list of property links
         '''
         property_list = []
-        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div[position() < 11]')))
+        properties = WebDriverWait(self.driver, 100).until(EC.presence_of_all_elements_located((By.XPATH, '//main/div[2]/div/div')))
         property_list.clear()
         for property in properties:
             a_tag = property.find_element(By.TAG_NAME, 'a')
@@ -117,7 +117,7 @@ class Scraper:
             list: list of links for each image of property
         '''
         property_img_list = []
-        next_img = self.driver.find_element(By.XPATH, '//main/div/div/section//button[@aria-label= "Next image"]')
+        next_img = self.driver.find_element(By.XPATH, '//main/div/div//section//button[@aria-label= "Next image"]')
         property_imgs = self.driver.find_elements(By.XPATH, '//main/div/div/section//li')
         for property in property_imgs[1:-1]:
             displayed_img = property.find_element(By.XPATH, '//main/div/div/section//li[@aria-hidden= "false"]')
@@ -196,7 +196,7 @@ class Scraper:
     def create_raw_data_folder(self):
         '''Deletes existing raw_data folder and generates new one
         '''
-        dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
+        dir = './raw_data/'
         try:
             shutil.rmtree(dir)
         except:
@@ -215,7 +215,7 @@ class Scraper:
         Returns:
             str: path to current property directory
         '''
-        parent_dir = '/home/muaz/Desktop/AiCore/Data_Collection_Pipeline/raw_data/'
+        parent_dir = './raw_data/'
         directory = current_property['UID']
         uid_directory = os.path.join(parent_dir, directory)
         os.mkdir(uid_directory)
@@ -245,7 +245,7 @@ class Scraper:
         Returns:
             img_path (str): path to current property's image directory
         '''
-        directory = 'Images'
+        directory = 'Images/'
         img_path = os.path.join(uid_directory, directory)
         os.mkdir(img_path)
         return img_path
@@ -276,15 +276,15 @@ class Scraper:
         time.sleep(2)
         self.search_ng8()
         time.sleep(3)
-        # page_counter = 1
-        # while page_counter < 5:
-        #     if page_counter == 2:
-        #         self.close_email_popup()
-        #     property_list = self.get_property_links()
-        #     self.big_list.extend(property_list)
-        #     self.change_page()
-        #     time.sleep(1)
-        #     page_counter += 1
+        page_counter = 1
+        while page_counter < 5:
+            if page_counter == 2:
+                self.close_email_popup()
+            property_list = self.get_property_links()
+            self.big_list.extend(property_list)
+            self.change_page()
+            time.sleep(1)
+            page_counter += 1
         property_list = self.get_property_links()
         self.big_list.extend(property_list)
         print(len(self.big_list))
@@ -344,19 +344,7 @@ class Scraper:
         print('Folders created and data stored')
 
 
-
-    def upload_data_to_aws_rds(self, current_property, df):
-        '''Uploads current property table to AWS RDS
         
-        Args:
-            current_property (dict): Dictionary containing keys and values of current property
-            df (pandas.core.frame.DataFrame): current_property as a pandas dataframe
-        '''
-        self.engine.connect()
-        df.to_sql(current_property['UID'], self.engine, if_exists='replace')
-        
-        
-
 def scrape(url, driver):
     '''The block of code that runs the entire scraper
     
@@ -390,11 +378,10 @@ def scrape(url, driver):
         uid_directory = p.create_json_files(current_property)
         p.get_images(uid_directory, current_property)
         print(f'Got info for property {property_counter}')
-        print('Uploaded to RDS')
         property_counter += 1
     df = pd.DataFrame.from_dict(p.property_dict['Property'])
-    p.engine.connect()
-    df.to_sql('PropertyTable', p.engine, if_exists='replace')
+    # p.engine.connect()
+    # df.to_sql('PropertyTable', p.engine, if_exists='replace')
     driver.close()
     print('\nFinished!')
 
@@ -404,5 +391,7 @@ if __name__ == '__main__':
     url = 'https://www.zoopla.co.uk/'
     chrome_options = Options()
     chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
     driver = webdriver.Chrome(options=chrome_options)
     scrape(url, driver)
