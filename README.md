@@ -25,3 +25,7 @@ Amazon Web Service (AWS) was used for its s3 and RDS services. All data.json and
 
 ### Milestone 7 & 8: Preventing rescraping, containerising and running on cloud:
 I made a list which stores the UIDs of the properties which have been scraped. The UID of the current property being viewed is checked against this list and if it is already present, the scraper skips the property. The scraper was containerised using docker for which an image was made which installed all dependecies and ran the main code. The image was pushed to docker hub to be available to be pulled. An AWS EC2 free tier instance was made and connected to on which docker was installed and the script was able to run.
+
+
+### Milestone 9: Monitoring and alerting
+On the EC2 instance, prometheus was set up to monitor itself, docker and the hardware via node exporter. This was done by adding jobs to the prometheus.yml file, and metric addresses to the daemon.json file. When prometheus was running successfully, expressions could be written and queried to specify what needed monitoring. Grafana was then installed on the local system, and the server was started. In the configuration, it was specified that grafana should monitor the url at which prometheus was running for the EC2 instance. On the dashboard, a panel was made to monitor the docker metrics, and another was made to monitor the OS metrics.
